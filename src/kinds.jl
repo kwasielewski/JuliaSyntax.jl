@@ -51,6 +51,7 @@ const _kind_names =
         "quote"
         "return"
         "struct"
+        "rectypes"
         "try"
         "using"
         "while"

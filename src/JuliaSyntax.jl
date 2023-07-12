@@ -2,7 +2,10 @@ module JuliaSyntax
 
 # Conservative list of exports - only export the most common/useful things
 # here.
-
+function greet()
+  println("Hello")
+end
+export greet
 # Parsing. See also
 #   parse!(), ParseStream
 export parsestmt, parseall, parseatom

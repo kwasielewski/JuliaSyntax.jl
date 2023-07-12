@@ -236,7 +236,7 @@ function is_initial_reserved_word(ps::ParseState, k)
     k = kind(k)
     is_iresword = k in KSet"begin while if for try return break continue function
                             macro quote let local global const do struct module
-                            baremodule using import export"
+                            baremodule using import export rectypes"
     # `begin` means firstindex(a) inside a[...]
     return is_iresword && !(k == K"begin" && ps.end_symbol)
 end
@@ -250,6 +250,7 @@ end
 # syntactic structure.
 function peek_initial_reserved_words(ps::ParseState)
     k = peek(ps)
+    println("peek_initial_reserved_words: k = $k")
     if is_initial_reserved_word(ps, k)
         return true
     elseif is_contextual_keyword(k)
@@ -264,7 +265,7 @@ end
 
 function is_block_form(k)
     kind(k) in KSet"block quote if for while let function macro
-                    abstract primitive struct try module"
+                    abstract primitive struct try module rectypes"
 end
 
 function is_syntactic_operator(k)
@@ -484,6 +485,7 @@ function parse_stmts(ps::ParseState)
     mark = position(ps)
     do_emit = parse_Nary(ps, parse_docstring, (K";",), (K"NewlineWs",))
     # check for unparsed junk after an expression
+    println("here")
     junk_mark = position(ps)
     while peek(ps) ∉ KSet"EndMarker NewlineWs"
         # Error recovery
@@ -497,6 +499,7 @@ function parse_stmts(ps::ParseState)
     if do_emit
         emit(ps, mark, K"toplevel", TOPLEVEL_SEMICOLONS_FLAG)
     end
+    println("here2")
 end
 
 # Parse docstrings attached by a space or single newline
@@ -552,6 +555,7 @@ end
 #
 # flisp: parse-eq*
 function parse_eq_star(ps::ParseState)
+    println("parse_eq_star")
     k = peek(ps)
     k2 = peek(ps,2)
     if (is_literal(k) || k == K"Identifier") && k2 in KSet", ) } ]"
@@ -583,6 +587,10 @@ function parse_assignment_with_initial_ex(ps::ParseState, mark, down::T) where {
             # Unary ~ in space sensitive context is not assignment precedence
             # [a ~b]  ==>  (hcat a (call-pre ~ b))
             return
+    mark = position(ps)
+    bump(ps, TRIVIA_FLAG)
+    parse_call_arglist(ps, K"}")
+    emit(ps, mark, K"rectypes")
         end
         # ~ is the only non-syntactic assignment-precedence operator.
         # a ~ b      ==>  (call-i a ~ b)
@@ -746,6 +754,7 @@ end
 #
 # flisp: parse-or
 function parse_or(ps::ParseState)
+    println("parse_or")
     parse_lazy_cond(ps, parse_and, is_prec_lazy_or, parse_or)
 end
 
@@ -937,6 +946,7 @@ end
 #
 # flisp: parse-expr
 function parse_expr(ps::ParseState)
+    println("parse_expr")
     parse_with_chains(ps, parse_term, is_prec_plus, KSet"+ ++")
 end
 
@@ -1082,6 +1092,7 @@ end
 #
 # flisp: parse-juxtapose
 function parse_juxtapose(ps::ParseState)
+    println("parse_juxtapose")
     mark = position(ps)
     parse_unary(ps)
     n_terms = 1
@@ -1333,6 +1344,7 @@ end
 #
 # flisp: parse-factor
 function parse_factor(ps::ParseState)
+    print("parse_factor\n")
     mark = position(ps)
     parse_call(ps)
     parse_factor_with_initial_ex(ps, mark)
@@ -1380,7 +1392,9 @@ end
 #
 # flisp: parse-call
 function parse_call(ps::ParseState)
+    print("parse_call\n")
     if peek_initial_reserved_words(ps)
+        println("parse_call: peek_initial_reserved_words(ps) is true")
         parse_resword(ps)
     else
         mark = position(ps)
@@ -1745,6 +1759,12 @@ function parse_struct_field(ps::ParseState)
     end
 end
 
+function parse_rectypes(ps::ParseState)
+    #mark = position(ps)
+    parse_block_inner(ps, parse_resword)
+
+end
+
 # parse expressions or blocks introduced by syntactic reserved words.
 #
 # The caller should use peek_initial_reserved_words to determine whether
@@ -1753,6 +1773,7 @@ end
 #
 # flisp: parse-resword
 function parse_resword(ps::ParseState)
+    print("In parse_resword")
     # In normal_context
     # begin f() where T = x end  ==>  (block (= (where (call f) T) x))
     ps = normal_context(ps)
@@ -1915,6 +1936,13 @@ function parse_resword(ps::ParseState)
         parse_block(ps, parse_struct_field)
         bump_closing_token(ps, K"end")
         emit(ps, mark, K"struct", is_mut ? MUTABLE_FLAG : EMPTY_FLAGS)
+    elseif word == K"rectypes"
+        # idk yet how to write it
+        @check peek(ps) == K"rectypes"
+        bump(ps, TRIVIA_FLAG)
+        emit(ps, mark, K"rectypes")
+        parse_rectypes(ps)
+        bump_closing_token(ps, K"end")
     elseif word == K"primitive"
         # primitive type A 32 end             ==> (primitive A 32)
         # primitive type A 32 ; end           ==> (primitive A 32)

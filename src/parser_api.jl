@@ -16,7 +16,7 @@ function ParseError(stream::ParseStream; incomplete_tag=:none, kws...)
 end
 
 function Base.showerror(io::IO, err::ParseError)
-    println(io, "ParseError:")
+    println(io, "LocalParseError:")
     show_diagnostics(io, err.diagnostics, err.source)
 end
 
